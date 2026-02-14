@@ -1,0 +1,9 @@
+installation:
+  kubernetesProvider: AKS
+  cni:
+    type: Calico
+  calicoNetwork:
+    bgp: Disabled
+    ipPools:
+    - cidr: 10.201.0.0/16
+      encapsulation: VXLAN

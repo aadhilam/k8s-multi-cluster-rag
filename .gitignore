@@ -1,0 +1,11 @@
+.env
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+kubeconfigs/
+calico-cloud-key.yaml
+config.json
+licensekey.yaml
+cluster-mesh-setup/
+.DS_Store

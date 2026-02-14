@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: embedding-cronjob
+  namespace: embedding
+  labels:
+    app: embedding-cronjob
+    app.kubernetes.io/part-of: ai-platform
+spec:
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 1800
+      template:
+        metadata:
+          labels:
+            app: embedding-job
+            app.kubernetes.io/part-of: ai-platform
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: embedding
+              image: python:3.11-slim
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  pip install requests --quiet
+                  python /scripts/embed.py
+              env:
+                - name: QDRANT_HOST
+                  value: "qdrant.embedding.svc.cluster.local"
+                - name: QDRANT_PORT
+                  value: "6333"
+                - name: OLLAMA_HOST
+                  value: "embedding-ollama.embedding.svc.cluster.local"
+                - name: EMBEDDING_MODEL
+                  value: "nomic-embed-text"
+                - name: COLLECTION_NAME
+                  value: "documents"
+                - name: DOCS_PATH
+                  value: "/documents"
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+                - name: documents
+                  mountPath: /documents
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+          volumes:
+            - name: scripts
+              configMap:
+                name: embedding-script
+            - name: documents
+              configMap:
+                name: sample-documents

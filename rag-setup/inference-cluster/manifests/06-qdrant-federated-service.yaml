@@ -1,0 +1,18 @@
+# Federated service: reach Qdrant in embedding-cluster (embedding namespace) via Calico cluster mesh
+# Placed in embedding namespace to mirror the backend. RAG agent uses qdrant-federated.embedding.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant-federated
+  namespace: embedding
+  annotations:
+    federation.tigera.io/serviceSelector: app == "qdrant"
+spec:
+  ports:
+    - name: http
+      port: 6333
+      targetPort: 6333
+    - name: grpc
+      port: 6334
+      targetPort: 6334
+  type: ClusterIP

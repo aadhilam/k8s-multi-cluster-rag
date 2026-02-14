@@ -1,0 +1,19 @@
+# Expose Qdrant via LoadBalancer for admin/API access from outside the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant-lb
+  namespace: embedding
+  labels:
+    app: qdrant
+spec:
+  type: LoadBalancer
+  selector:
+    app: qdrant
+  ports:
+    - name: http
+      port: 6333
+      targetPort: 6333
+    - name: grpc
+      port: 6334
+      targetPort: 6334

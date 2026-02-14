@@ -1,0 +1,8 @@
+# Namespace for federated services whose backend runs in embedding-cluster (embedding namespace)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: embedding
+  labels:
+    app.kubernetes.io/part-of: ai-platform
+    environment: federated

@@ -1,0 +1,15 @@
+# Federated service: reach RAG agent in inference-cluster (inference namespace) via Calico cluster mesh
+# Placed in inference namespace so it mirrors the backend's namespace. Frontend nginx proxies /api/rag to rag-agent.inference.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-agent
+  namespace: inference
+  annotations:
+    federation.tigera.io/serviceSelector: app == "rag-agent"
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: ClusterIP

@@ -1,0 +1,8 @@
+# Namespace for federated services whose backend runs in gateway-cluster (gateway namespace)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway
+  labels:
+    app.kubernetes.io/part-of: ai-platform
+    environment: federated

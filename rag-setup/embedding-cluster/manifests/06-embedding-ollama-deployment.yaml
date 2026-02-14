@@ -1,0 +1,69 @@
+# Embedding model for batch embedding jobs (nomic-embed-text)
+# Used by embedding-cronjob in this cluster; gateway RAG uses inference-cluster Ollama
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedding-ollama
+  namespace: embedding
+  labels:
+    app: embedding-ollama
+    app.kubernetes.io/part-of: ai-platform
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: embedding-ollama
+  template:
+    metadata:
+      labels:
+        app: embedding-ollama
+        app.kubernetes.io/part-of: ai-platform
+    spec:
+      initContainers:
+        - name: model-pull
+          image: ollama/ollama:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              ollama serve &
+              sleep 5
+              ollama pull nomic-embed-text
+              pkill ollama
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          ports:
+            - containerPort: 11434
+              name: http
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          readinessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            initialDelaySeconds: 40
+            periodSeconds: 30
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: embedding-ollama-models

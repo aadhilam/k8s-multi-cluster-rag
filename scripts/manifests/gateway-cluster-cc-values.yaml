@@ -1,0 +1,10 @@
+installer:
+  clusterName: gateway-cluster
+  calicoCloudVersion: v22.1.0
+  components:
+    compliance:
+      enabled: false
+    imageAssurance:
+      state: Disabled
+    runtimeSecurity:
+      state: Disabled

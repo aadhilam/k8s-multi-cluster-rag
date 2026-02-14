@@ -1,0 +1,81 @@
+# LLM in inference-cluster: Phi-3 (GPU) for completion, nomic-embed-text for embeddings (RAG)
+# Schedules on GPU node pool (label workload=llm, taint workload=llm:NoSchedule)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: inference
+  labels:
+    app: ollama
+    app.kubernetes.io/part-of: ai-platform
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+        app.kubernetes.io/part-of: ai-platform
+    spec:
+      nodeSelector:
+        workload: "llm"
+      tolerations:
+        - key: workload
+          operator: Equal
+          value: "llm"
+          effect: NoSchedule
+      initContainers:
+        - name: model-pull
+          image: ollama/ollama:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              ollama serve &
+              sleep 5
+              ollama pull phi3
+              ollama pull nomic-embed-text
+              pkill ollama
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          ports:
+            - containerPort: 11434
+              name: http
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "1000m"
+            limits:
+              memory: "8Gi"
+              cpu: "2000m"
+              nvidia.com/gpu: 1
+          readinessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ollama-models

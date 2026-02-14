@@ -1,0 +1,52 @@
+# Nginx config: serve static frontend at / and proxy /api/rag and /api/llm to federated/local services
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-nginx-config
+  namespace: gateway
+  labels:
+    app: frontend
+    app.kubernetes.io/part-of: ai-platform
+data:
+  nginx.conf: |
+    worker_processes 1;
+    events { worker_connections 1024; }
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+      sendfile on;
+      keepalive_timeout 65;
+      server {
+        listen 80;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+        location / {
+          try_files $uri $uri/ /index.html;
+        }
+        location /api/rag/ {
+          rewrite ^/api/rag(.*) $1 break;
+          proxy_pass http://rag-agent.inference.svc.cluster.local;
+          proxy_http_version 1.1;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_read_timeout 120s;
+          proxy_connect_timeout 10s;
+          proxy_send_timeout 120s;
+        }
+        location /api/llm/ {
+          rewrite ^/api/llm(.*) $1 break;
+          proxy_pass http://litellm-federated:4000;
+          proxy_http_version 1.1;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_read_timeout 120s;
+          proxy_connect_timeout 10s;
+          proxy_send_timeout 120s;
+        }
+      }
+    }

@@ -1,0 +1,8 @@
+# Namespace for federated services whose backend runs in inference-cluster (inference namespace)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: inference
+  labels:
+    app.kubernetes.io/part-of: ai-platform
+    environment: federated

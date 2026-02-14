@@ -1,0 +1,17 @@
+# Single entry point: LoadBalancer exposes frontend; nginx proxies /api/rag and /api/llm to federated services
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: gateway
+  labels:
+    app: frontend
+    app.kubernetes.io/part-of: ai-platform
+spec:
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+  type: LoadBalancer

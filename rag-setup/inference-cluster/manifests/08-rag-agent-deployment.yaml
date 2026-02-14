@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-agent
+  namespace: inference
+  labels:
+    app: rag-agent
+    app.kubernetes.io/part-of: ai-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rag-agent
+  template:
+    metadata:
+      labels:
+        app: rag-agent
+        app.kubernetes.io/part-of: ai-platform
+    spec:
+      containers:
+        - name: rag-agent
+          image: python:3.11-slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install flask requests --quiet
+              python /app/app.py
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: QDRANT_HOST
+              value: "qdrant-federated.embedding.svc.cluster.local"
+            - name: QDRANT_PORT
+              value: "6333"
+            - name: COLLECTION_NAME
+              value: "documents"
+            - name: EMBEDDING_MODEL
+              value: "nomic-embed-text"
+            - name: LITELLM_HOST
+              value: "litellm.inference.svc.cluster.local"
+            - name: LITELLM_PORT
+              value: "4000"
+            - name: COMPLETION_MODEL
+              value: "phi3"
+          volumeMounts:
+            - name: app-code
+              mountPath: /app
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: app-code
+          configMap:
+            name: rag-agent-config

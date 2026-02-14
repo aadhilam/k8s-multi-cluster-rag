@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: gateway
+  labels:
+    app: frontend
+    app.kubernetes.io/part-of: ai-platform
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>AI Cluster Mesh Demo</title>
+      <style>
+        * { box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+        h1 { font-size: 1.25rem; }
+        textarea { width: 100%; min-height: 80px; margin: 0.5rem 0; padding: 0.5rem; }
+        button { padding: 0.5rem 1rem; cursor: pointer; }
+        .response { white-space: pre-wrap; background: #f5f5f5; padding: 1rem; margin-top: 1rem; border-radius: 4px; }
+        .error { color: #c00; }
+      </style>
+    </head>
+    <body>
+      <h1>AI Cluster Mesh Demo</h1>
+      <p>Chat: LiteLLM (inference) → Ollama. RAG: agent (inference) → LiteLLM (embed + complete), search Qdrant.</p>
+      <label>Question (for RAG agent):</label>
+      <textarea id="question" placeholder="Ask a question...">What is our security policy?</textarea>
+      <div>
+        <button id="rag">Ask RAG Agent</button>
+        <button id="chat">Send to LLM (phi3)</button>
+      </div>
+      <div id="out" class="response"></div>
+      <script>
+        const out = document.getElementById('out');
+        const question = document.getElementById('question');
+        function show(msg, isErr) {
+          out.textContent = msg;
+          out.className = 'response' + (isErr ? ' error' : '');
+        }
+        async function parseJsonOrShowError(r, forRag) {
+          const text = await r.text();
+          if (!r.ok) {
+            show('Error ' + r.status + (r.status === 502 ? ': Backend unreachable (RAG agent or LiteLLM may be starting). Try again in a moment.' : ': ') + (text.startsWith('<') ? '' : '\n' + text), true);
+            return;
+          }
+          try {
+            const j = JSON.parse(text);
+            if (forRag) show(j.answer || JSON.stringify(j, null, 2));
+            else show(j.choices?.[0]?.message?.content || JSON.stringify(j, null, 2));
+          } catch (e) {
+            show('Server returned non-JSON:\n' + text.slice(0, 500), true);
+          }
+        }
+        document.getElementById('rag').onclick = async () => {
+          show('Calling RAG agent...');
+          try {
+            const r = await fetch('/api/rag/query', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ question: question.value })
+            });
+            await parseJsonOrShowError(r, true);
+          } catch (e) {
+            show('Error: ' + e.message, true);
+          }
+        };
+        document.getElementById('chat').onclick = async () => {
+          show('Calling LLM...');
+          try {
+            const r = await fetch('/api/llm/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: 'phi3',
+                messages: [{ role: 'user', content: question.value }]
+              })
+            });
+            await parseJsonOrShowError(r, false);
+          } catch (e) {
+            show('Error: ' + e.message, true);
+          }
+        };
+      </script>
+    </body>
+    </html>
