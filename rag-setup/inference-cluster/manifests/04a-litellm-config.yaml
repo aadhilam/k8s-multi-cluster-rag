@@ -1,4 +1,4 @@
-# LiteLLM proxy in inference-cluster: completions and embeddings to local Ollama
+# LiteLLM proxy in inference-cluster: completions to ollama (phi3), embeddings to ollama-embed (nomic-embed-text)
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -17,6 +17,6 @@ data:
       - model_name: nomic-embed-text
         litellm_params:
           model: ollama/nomic-embed-text
-          api_base: http://ollama.inference.svc.cluster.local:11434
+          api_base: http://ollama-embed.inference.svc.cluster.local:11434
     litellm_settings:
       set_verbose: false

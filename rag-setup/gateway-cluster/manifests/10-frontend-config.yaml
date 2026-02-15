@@ -26,7 +26,7 @@ data:
     </head>
     <body>
       <h1>AI Cluster Mesh Demo</h1>
-      <p>Chat: LiteLLM (inference) → Ollama. RAG: agent (inference) → LiteLLM (embed + complete), search Qdrant.</p>
+      <p>All requests go through RAG agent (inference): RAG uses embed + Qdrant + LLM; chat is proxied to LLM.</p>
       <label>Question (for RAG agent):</label>
       <textarea id="question" placeholder="Ask a question...">What is our security policy?</textarea>
       <div>
@@ -44,7 +44,7 @@ data:
         async function parseJsonOrShowError(r, forRag) {
           const text = await r.text();
           if (!r.ok) {
-            show('Error ' + r.status + (r.status === 502 ? ': Backend unreachable (RAG agent or LiteLLM may be starting). Try again in a moment.' : ': ') + (text.startsWith('<') ? '' : '\n' + text), true);
+            show('Error ' + r.status + (r.status === 502 ? ': Backend unreachable (RAG agent may be starting). Try again in a moment.' : ': ') + (text.startsWith('<') ? '' : '\n' + text), true);
             return;
           }
           try {
@@ -69,9 +69,9 @@ data:
           }
         };
         document.getElementById('chat').onclick = async () => {
-          show('Calling LLM...');
+          show('Calling LLM via RAG agent...');
           try {
-            const r = await fetch('/api/llm/v1/chat/completions', {
+            const r = await fetch('/api/rag/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

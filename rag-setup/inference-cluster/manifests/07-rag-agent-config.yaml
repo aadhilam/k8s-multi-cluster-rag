@@ -116,11 +116,35 @@ data:
             "debug": debug_info
         })
 
+    @app.route("/chat", methods=["POST"])
+    def chat():
+        """Proxy chat completions to LiteLLM so frontend never talks to LLM directly."""
+        data = request.json or {}
+        try:
+            llm_url = "http://{}:{}/v1/chat/completions".format(LITELLM_HOST, LITELLM_PORT)
+            llm_response = requests.post(
+                llm_url,
+                json={
+                    "model": data.get("model", COMPLETION_MODEL),
+                    "messages": data.get("messages", []),
+                    "stream": data.get("stream", False),
+                },
+                timeout=120,
+            )
+            llm_response.raise_for_status()
+            return jsonify(llm_response.json())
+        except Exception as e:
+            return jsonify({"error": str(e), "choices": []}), 502
+
     @app.route("/", methods=["GET"])
     def index():
         return jsonify({
             "service": "RAG Agent (Inference Cluster)",
-            "endpoints": {"/query": "POST - Ask a question", "/health": "GET - Health check"}
+            "endpoints": {
+                "/query": "POST - Ask a question (RAG)",
+                "/chat": "POST - Chat completions (proxied to LLM)",
+                "/health": "GET - Health check"
+            }
         })
 
     if __name__ == "__main__":

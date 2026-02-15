@@ -1,4 +1,4 @@
-# LLM in inference-cluster: Phi-3 (GPU) for completion, nomic-embed-text for embeddings (RAG)
+# LLM in inference-cluster: Phi-3 (GPU) for completion only. Embeddings use ollama-embed (nomic-embed-text).
 # Schedules on GPU node pool (label workload=llm, taint workload=llm:NoSchedule)
 apiVersion: apps/v1
 kind: Deployment
@@ -28,24 +28,28 @@ spec:
           operator: Equal
           value: "llm"
           effect: NoSchedule
-      initContainers:
-        - name: model-pull
-          image: ollama/ollama:latest
-          command:
-            - /bin/sh
-            - -c
-            - |
-              ollama serve &
-              sleep 5
-              ollama pull phi3
-              ollama pull nomic-embed-text
-              pkill ollama
-          volumeMounts:
-            - name: models
-              mountPath: /root/.ollama
-          resources:
-            limits:
-              nvidia.com/gpu: 1
+      # initContainers:
+      #   - name: model-pull
+      #     image: ollama/ollama:latest
+      #     env:
+      #       - name: OLLAMA_NUM_PARALLEL
+      #         value: "4"
+      #     command:
+      #       - /bin/sh
+      #       - -c
+      #       - |
+      #         ollama serve &
+      #         until ollama list >/dev/null 2>&1; do sleep 1; done
+      #         ollama pull phi3 &
+      #         # ollama pull nomic-embed-text &
+      #         wait
+      #         pkill ollama
+      #     volumeMounts:
+      #       - name: models
+      #         mountPath: /root/.ollama
+      #     resources:
+      #       limits:
+      #         nvidia.com/gpu: 1
       containers:
         - name: ollama
           image: ollama/ollama:latest

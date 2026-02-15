@@ -128,6 +128,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster_2" {
 }
 
 # GPU node pool for inference cluster (optional)
+# Label and taint match ollama/nvidia-device-plugin manifests (nodeSelector workload=llm, toleration workload=llm:NoSchedule)
 resource "azurerm_kubernetes_cluster_node_pool" "inference_gpu" {
   count                 = var.aks_2_gpu_node_pool_enabled ? 1 : 0
   name                  = "gpu"
@@ -136,6 +137,12 @@ resource "azurerm_kubernetes_cluster_node_pool" "inference_gpu" {
   node_count            = var.aks_2_gpu_node_count
   vnet_subnet_id        = azurerm_subnet.subnet_2.id
   mode                  = "User"
+  node_labels = {
+    workload = "llm"
+  }
+  node_taints = [
+    "workload=llm:NoSchedule"
+  ]
 }
 
 ################################################################################

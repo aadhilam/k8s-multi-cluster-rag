@@ -1,4 +1,4 @@
-# Single entry point: LoadBalancer exposes frontend; nginx proxies /api/rag and /api/llm to federated services
+# Single entry point: LoadBalancer exposes frontend; nginx proxies /api/rag only (all LLM via RAG agent)
 apiVersion: v1
 kind: Service
 metadata:

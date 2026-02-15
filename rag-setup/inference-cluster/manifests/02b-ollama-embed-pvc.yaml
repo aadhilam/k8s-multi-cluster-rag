@@ -1,0 +1,16 @@
+# PVC for embedding-only Ollama (nomic-embed-text) in inference cluster
+# Separate from main ollama-models so phi3 and embeddings run on different pods
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-embed-models
+  namespace: inference
+  labels:
+    app: ollama-embed
+    app.kubernetes.io/part-of: ai-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

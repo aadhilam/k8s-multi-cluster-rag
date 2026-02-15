@@ -1,12 +1,12 @@
-# Embedding model for batch embedding jobs (nomic-embed-text)
-# Used by embedding-cronjob in this cluster; gateway RAG uses inference-cluster Ollama
+# Embedding-only Ollama in inference-cluster: nomic-embed-text for RAG query embeddings
+# CPU-only (no GPU); LiteLLM routes nomic-embed-text here so phi3 and embeddings are separate
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: embedding-ollama
-  namespace: embedding
+  name: ollama-embed
+  namespace: inference
   labels:
-    app: embedding-ollama
+    app: ollama-embed
     app.kubernetes.io/part-of: ai-platform
 spec:
   replicas: 1
@@ -14,30 +14,30 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: embedding-ollama
+      app: ollama-embed
   template:
     metadata:
       labels:
-        app: embedding-ollama
+        app: ollama-embed
         app.kubernetes.io/part-of: ai-platform
     spec:
-      initContainers:
-        - name: model-pull
-          image: ollama/ollama:latest
-          env:
-            - name: OLLAMA_NUM_PARALLEL
-              value: "4"
-          command:
-            - /bin/sh
-            - -c
-            - |
-              ollama serve &
-              until ollama list >/dev/null 2>&1; do sleep 1; done
-              ollama pull nomic-embed-text
-              pkill ollama
-          volumeMounts:
-            - name: models
-              mountPath: /root/.ollama
+      # initContainers:
+      #   - name: model-pull
+      #     image: ollama/ollama:latest
+      #     env:
+      #       - name: OLLAMA_NUM_PARALLEL
+      #         value: "4"
+      #     command:
+      #       - /bin/sh
+      #       - -c
+      #       - |
+      #         ollama serve &
+      #         until ollama list >/dev/null 2>&1; do sleep 1; done
+      #         ollama pull nomic-embed-text
+      #         pkill ollama
+      #     volumeMounts:
+      #       - name: models
+      #         mountPath: /root/.ollama
       containers:
         - name: ollama
           image: ollama/ollama:latest
@@ -69,4 +69,4 @@ spec:
       volumes:
         - name: models
           persistentVolumeClaim:
-            claimName: embedding-ollama-models
+            claimName: ollama-embed-models

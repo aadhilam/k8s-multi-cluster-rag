@@ -191,7 +191,7 @@ variable "aks_2_gpu_node_pool_enabled" {
 variable "aks_2_gpu_vm_size" {
   type        = string
   description = "VM size for the inference cluster GPU node pool. Use a size you have quota for (e.g. Standard_NC6s_v3). If you hit NCASv3_T4 quota in West US, try East US via vnet_2_location or a different SKU."
-  default     = "Standard_NC6s_v3"
+  default     = "Standard_NC4as_T4_v3"
 }
 
 variable "aks_2_gpu_node_count" {
