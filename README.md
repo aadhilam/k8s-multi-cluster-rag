@@ -1,4 +1,4 @@
-# AKS Cluster Mesh Demo
+# K8S Multi-Cluster RAG
 
 A demo environment that provisions a multi-cluster mesh on Azure Kubernetes Service (AKS), with network policy and observability via **Calico Cloud** or **Calico Enterprise**. The stack is driven by a single Makefile so you can bring up infrastructure, install Calico, and peer clusters from your machine.
 
