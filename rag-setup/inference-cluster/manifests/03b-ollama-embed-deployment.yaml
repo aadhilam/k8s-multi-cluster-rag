@@ -21,23 +21,23 @@ spec:
         app: ollama-embed
         app.kubernetes.io/part-of: ai-platform
     spec:
-      # initContainers:
-      #   - name: model-pull
-      #     image: ollama/ollama:latest
-      #     env:
-      #       - name: OLLAMA_NUM_PARALLEL
-      #         value: "4"
-      #     command:
-      #       - /bin/sh
-      #       - -c
-      #       - |
-      #         ollama serve &
-      #         until ollama list >/dev/null 2>&1; do sleep 1; done
-      #         ollama pull nomic-embed-text
-      #         pkill ollama
-      #     volumeMounts:
-      #       - name: models
-      #         mountPath: /root/.ollama
+      initContainers:
+        - name: model-pull
+          image: ollama/ollama:latest
+          env:
+            - name: OLLAMA_NUM_PARALLEL
+              value: "4"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              ollama serve &
+              until ollama list >/dev/null 2>&1; do sleep 1; done
+              ollama pull nomic-embed-text
+              pkill ollama
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
       containers:
         - name: ollama
           image: ollama/ollama:latest

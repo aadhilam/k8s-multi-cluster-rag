@@ -23,14 +23,14 @@ fi
 echo "Helm release 'calico-enterprise' not found. Proceeding with installation..."
 
 # Download the Tigera operator chart
-curl -O -L https://downloads.tigera.io/ee/charts/tigera-operator-v3.19.4-0.tgz
+curl -O -L https://downloads.tigera.io/ee/charts/tigera-operator-v3.21.6-0.tgz
 
 # Write image pull secret and license key to files
-echo "$CALICO_PULL_SECRET" > config.json
+echo "$CALICO_PULL_SECRET" | base64 -d > config.json
 echo "$CALICO_LICENSE_KEY" | base64 -d > licensekey.yaml
 
 # Perform the Helm install
-helm install calico-enterprise tigera-operator-v3.19.4-0.tgz \
+helm install calico-enterprise tigera-operator-v3.21.6-0.tgz \
   -f "${MANIFESTS_DIR}/${CLUSTER_NAME}-values.yaml" \
   --set-file imagePullSecrets.tigera-pull-secret=config.json,tigera-prometheus-operator.imagePullSecrets.tigera-pull-secret=config.json \
   --set-file licenseKeyContent=licensekey.yaml \

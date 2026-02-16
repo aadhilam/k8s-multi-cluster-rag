@@ -1,5 +1,5 @@
 # Makefile for AKS Cluster Mesh Demo
-# Replicates the GitHub Actions workflow: deploy-calico-cloud.yaml
+# Supports both Calico Cloud (make all) and Calico Enterprise (make all-ce) workflows
 
 # Configuration
 LOCATION ?= eastus
@@ -16,7 +16,7 @@ endif
 # Default shell
 SHELL := /bin/bash
 
-.PHONY: all help setup-backend infra kubeconfigs install-calico check-api install-cc check-cc mesh clean destroy rag-apply rag-apply-gateway rag-apply-inference rag-apply-embedding rag-delete rag-delete-gateway rag-delete-inference rag-delete-embedding install-inference-stack rag-apply-vllm rag-apply-vllm-inference rag-apply-vllm-gateway rag-apply-vllm-embedding rag-delete-vllm deploy-inference-vllm
+.PHONY: all all-ce help setup-backend infra kubeconfigs install-calico check-api install-cc check-cc install-ce check-ce mesh clean destroy rag-apply rag-apply-gateway rag-apply-inference rag-apply-embedding rag-delete rag-delete-gateway rag-delete-inference rag-delete-embedding install-inference-stack rag-apply-vllm rag-apply-vllm-inference rag-apply-vllm-gateway rag-apply-vllm-embedding rag-delete-vllm deploy-inference-vllm
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -24,7 +24,9 @@ help: ## Show this help message
 	@echo 'Targets:'
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-all: setup-backend infra kubeconfigs install-calico check-api install-cc check-cc mesh ## Run the full workflow sequentially
+all: setup-backend infra kubeconfigs install-calico check-api install-cc check-cc mesh ## Run the full Calico Cloud workflow sequentially
+
+all-ce: setup-backend infra kubeconfigs install-ce check-api check-ce mesh ## Run the full Calico Enterprise workflow sequentially
 
 setup-backend: ## Create Azure resources for Terraform backend (tfstate)
 	@echo "Creating Terraform backend resources..."
@@ -78,6 +80,23 @@ check-cc: ## Verify Calico Cloud license status
 	./scripts/check-cc-license.sh ./kubeconfigs/embedding-cluster.yaml embedding-cluster & \
 	wait
 	@echo "License checks passed."
+
+install-ce: ## Install Calico Enterprise on all clusters
+	@echo "Installing Calico Enterprise..."
+	chmod +x scripts/install-calico-enterprise.sh
+	./scripts/install-calico-enterprise.sh ./kubeconfigs/gateway-cluster.yaml gateway-cluster
+	./scripts/install-calico-enterprise.sh ./kubeconfigs/inference-cluster.yaml inference-cluster
+	./scripts/install-calico-enterprise.sh ./kubeconfigs/embedding-cluster.yaml embedding-cluster
+
+check-ce: ## Verify Calico Enterprise license status
+	@echo "Verifying Calico Enterprise license..."
+	chmod +x scripts/check-cc-license.sh
+	@# Reuses check-cc-license.sh – both CE and CC use the same licensekey CRD
+	./scripts/check-cc-license.sh ./kubeconfigs/gateway-cluster.yaml gateway-cluster & \
+	./scripts/check-cc-license.sh ./kubeconfigs/inference-cluster.yaml inference-cluster & \
+	./scripts/check-cc-license.sh ./kubeconfigs/embedding-cluster.yaml embedding-cluster & \
+	wait
+	@echo "Enterprise license checks passed."
 
 mesh: ## specific_setup Cluster Mesh peering
 	@echo "Setting up Cluster Mesh..."
