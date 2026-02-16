@@ -12,61 +12,39 @@ Brief reference for this repo’s RAG application running across three AKS clust
 
 ## Architecture diagram (Mermaid)
 
+Services only. Dashed lines are Calico federated service resolution (cross-cluster).
+
 ```mermaid
-flowchart TB
+flowchart LR
+  User([User])
+
   subgraph Gateway["gateway-cluster"]
-    subgraph ns_gw["namespace: gateway"]
-      Frontend["Deployment: frontend<br/>(Nginx + static UI)"]
-      SvcFrontend["Service: frontend<br/>Type: LoadBalancer :80"]
-    end
-    subgraph ns_inf_fed["namespace: inference (federated only)"]
-      SvcRagFed["Service: rag-agent (federated)<br/>selector: app=rag-agent"]
-    end
-    SvcFrontend --> Frontend
-    Frontend -->|"proxy /api/rag → rag-agent.inference.svc.cluster.local"| SvcRagFed
+    frontend["frontend<br/>LoadBalancer :80"]
+    rag_fed["rag-agent<br/>federated"]
   end
 
   subgraph Inference["inference-cluster"]
-    subgraph ns_inf["namespace: inference"]
-      Ollama["Deployment: ollama (phi3)"]
-      OllamaEmbed["Deployment: ollama-embed (nomic-embed-text)"]
-      LiteLLM["Deployment: litellm"]
-      RagAgent["Deployment: rag-agent"]
-      SvcOllama["Service: ollama :11434"]
-      SvcOllamaEmbed["Service: ollama-embed :11434"]
-      SvcLiteLLM["Service: litellm :4000"]
-      SvcRag["Service: rag-agent :80"]
-    end
-    subgraph ns_emb_fed["namespace: embedding (federated only)"]
-      SvcQdrantFed["Service: qdrant-federated (federated)<br/>selector: app=qdrant"]
-    end
-    SvcRag --> RagAgent
-    RagAgent --> SvcLiteLLM
-    RagAgent -->|"Qdrant search"| SvcQdrantFed
-    SvcLiteLLM --> Ollama
-    SvcLiteLLM --> OllamaEmbed
-    SvcOllama --> Ollama
-    SvcOllamaEmbed --> OllamaEmbed
+    rag["rag-agent :80"]
+    litellm["litellm :4000"]
+    ollama["ollama :11434"]
+    ollama_embed["ollama-embed :11434"]
+    qdrant_fed["qdrant-federated<br/>federated :6333,6334"]
   end
 
   subgraph Embedding["embedding-cluster"]
-    subgraph ns_emb["namespace: embedding"]
-      Qdrant["Deployment: qdrant"]
-      EmbedOllama["Deployment: embedding-ollama"]
-      CronJob["CronJob: embedding-cronjob"]
-      SvcQdrant["Service: qdrant :6333,6334"]
-      SvcEmbedOllama["Service: embedding-ollama :11434"]
-      SvcQdrantLB["Service: qdrant-lb (LoadBalancer)"]
-    end
-    SvcQdrant --> Qdrant
-    SvcQdrantLB --> Qdrant
-    SvcEmbedOllama --> EmbedOllama
-    CronJob --> EmbedOllama
-    CronJob --> Qdrant
+    qdrant["qdrant :6333,6334"]
+    qdrant_lb["qdrant-lb<br/>LoadBalancer"]
+    embed_ollama["embedding-ollama :11434"]
   end
 
-  SvcRagFed -.->|"Calico mesh"| SvcRag
-  SvcQdrantFed -.->|"Calico mesh"| SvcQdrant
+  User --> frontend
+  frontend -->|"/api/rag →"| rag_fed
+  rag_fed -.->|mesh| rag
+  rag --> litellm
+  rag -->|vector search| qdrant_fed
+  litellm --> ollama
+  litellm --> ollama_embed
+  qdrant_fed -.->|mesh| qdrant
 ```
 
 ---
