@@ -1,8 +1,10 @@
-# AKS Cluster Mesh Demo (Local Runner)
+# AKS Cluster Mesh Demo
 
-This project replicates the GitHub Actions workflow for deploying AKS clusters, installing Calico Cloud, and setting up a cluster mesh, but optimized for local execution using a Makefile.
+A demo environment that provisions a multi-cluster mesh on Azure Kubernetes Service (AKS), with network policy and observability via **Calico Cloud** or **Calico Enterprise**. The stack is driven by a single Makefile so you can bring up infrastructure, install Calico, and peer clusters from your machine.
 
-Three AKS clusters are provisioned: **gateway-cluster**, **inference-cluster**, and **embedding-cluster**. Kubeconfig files use the same names: `kubeconfigs/gateway-cluster.yaml`, `kubeconfigs/inference-cluster.yaml`, and `kubeconfigs/embedding-cluster.yaml`.
+**What it does:** Terraform creates three AKS clusters—**gateway-cluster**, **inference-cluster**, and **embedding-cluster**—then Calico (OSS base plus either Cloud or Enterprise) is installed and cluster mesh peering is configured. Kubeconfigs are written to `kubeconfigs/gateway-cluster.yaml`, `kubeconfigs/inference-cluster.yaml`, and `kubeconfigs/embedding-cluster.yaml`.
+
+**Install options:** Use **`make all`** for the full Calico Cloud path (default), or **`make all-ce`** for the full Calico Enterprise path.
 
 ## Prerequisites
 
@@ -39,11 +41,19 @@ This project uses a `Makefile` to manage the workflow. You can run the entire pi
 
 ### Quick Start
 
-To run the entire workflow from start to finish:
+Run the entire workflow from start to finish using one of:
 
-```bash
-make all
-```
+- **Calico Cloud** (default):
+  ```bash
+  make all
+  ```
+  This runs: backend → infra → kubeconfigs → Calico OSS → install Calico Cloud → license check → mesh.
+
+- **Calico Enterprise**:
+  ```bash
+  make all-ce
+  ```
+  This runs: backend → infra → kubeconfigs → install Calico Enterprise → license check → mesh.
 
 ### Step-by-Step Execution
 
@@ -65,18 +75,16 @@ You can run individual steps if you need to debug or pause between stages:
    make install-calico
    ```
 
-4. **Install Calico**:
+4. **Install Calico** (only needed if you are not using `make all` or `make all-ce`):
 
-For Calico Cloud 
-
-   ```bash
-   make install-cc
-   ```
-
-For Calico Enterprise
-   ```bash
-   make install-ce
-   ```
+   - **Calico Cloud** (used by `make all`):
+     ```bash
+     make install-cc
+     ```
+   - **Calico Enterprise** (used by `make all-ce`):
+     ```bash
+     make install-ce
+     ```
 
 5. **Cluster Mesh**: Configure peering between the clusters.
    ```bash
