@@ -1,0 +1,14 @@
+# Alias for the llm-d/kgateway inference gateway. After installing llm-d, the gateway
+# service is created with a name like infra-<release>-inference-gateway. Update the
+# externalName below to match your actual gateway service (same namespace).
+# Example: infra-inference-vllm-inference-gateway.inference-vllm.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: inference-gateway
+  namespace: inference-vllm
+  labels:
+    app.kubernetes.io/part-of: ai-platform-vllm
+spec:
+  type: ExternalName
+  externalName: infra-inference-scheduling-inference-gateway.inference-vllm.svc.cluster.local

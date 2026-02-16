@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: embedding-script
+  namespace: embedding-vllm
+  labels:
+    app: embedding-job
+    app.kubernetes.io/part-of: ai-platform-vllm
+data:
+  embed.py: |
+    import requests
+    import os
+    from pathlib import Path
+
+    QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant.embedding-vllm.svc.cluster.local")
+    QDRANT_PORT = os.getenv("QDRANT_PORT", "6333")
+    OLLAMA_HOST = os.getenv("OLLAMA_HOST", "embedding-ollama.embedding-vllm.svc.cluster.local")
+    OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
+    COLLECTION_NAME = os.getenv("COLLECTION_NAME", "documents")
+    DOCS_PATH = os.getenv("DOCS_PATH", "/documents")
+    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+    VECTOR_SIZE = 768
+
+    def create_collection():
+        try:
+            r = requests.get(f"http://{QDRANT_HOST}:{QDRANT_PORT}/collections/{COLLECTION_NAME}")
+            if r.status_code == 200:
+                print(f"Collection '{COLLECTION_NAME}' exists"); return True
+        except: pass
+        r = requests.put(f"http://{QDRANT_HOST}:{QDRANT_PORT}/collections/{COLLECTION_NAME}",
+            json={"vectors": {"size": VECTOR_SIZE, "distance": "Cosine"}})
+        if r.status_code in [200, 201]:
+            print(f"Created collection '{COLLECTION_NAME}'"); return True
+        print("Failed to create collection:", r.text); return False
+
+    def get_embedding(text):
+        r = requests.post(f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/api/embeddings",
+            json={"model": EMBEDDING_MODEL, "prompt": text}, timeout=60)
+        emb = r.json().get("embedding", [])
+        if not emb: raise Exception("Empty embedding")
+        return emb
+
+    def main():
+        print("Embedding job: Qdrant", QDRANT_HOST, "Ollama", OLLAMA_HOST)
+        if not create_collection(): exit(1)
+        docs_path = Path(DOCS_PATH)
+        points = []
+        for idx, f in enumerate(sorted(docs_path.glob("*.txt"))):
+            print("Processing", f.name)
+            text = f.read_text()
+            points.append({"id": idx + 1, "vector": get_embedding(text),
+                "payload": {"filename": f.name, "text": text[:1000], "full_text": text}})
+        if not points: print("No documents"); exit(1)
+        r = requests.put(f"http://{QDRANT_HOST}:{QDRANT_PORT}/collections/{COLLECTION_NAME}/points", json={"points": points})
+        if r.status_code in [200, 201]: print("Stored", len(points), "documents")
+        else: print("Upsert failed", r.text); exit(1)
+
+    if __name__ == "__main__": main()

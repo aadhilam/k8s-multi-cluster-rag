@@ -1,0 +1,29 @@
+# Direct HTTPRoute: routes traffic from kgateway to vllm-inference Service.
+# This bypasses the InferencePool/EPP (which had endpoint resolution issues
+# with kgateway v2.2.0-main + vLLM v0.6.6). Traffic still flows through the
+# gateway for telemetry.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: vllm-direct-route
+  namespace: inference-vllm
+  labels:
+    app.kubernetes.io/part-of: ai-platform-vllm
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: infra-inference-scheduling-inference-gateway
+  rules:
+    - backendRefs:
+        - kind: Service
+          name: vllm-inference
+          port: 8000
+          weight: 1
+      timeouts:
+        backendRequest: "0s"
+        request: "0s"
+      matches:
+        - path:
+            type: PathPrefix
+            value: /

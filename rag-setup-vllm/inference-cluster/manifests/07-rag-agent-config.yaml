@@ -1,0 +1,157 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-agent-config
+  namespace: inference-vllm
+  labels:
+    app: rag-agent
+    app.kubernetes.io/part-of: ai-platform-vllm
+data:
+  app.py: |
+    from flask import Flask, request, jsonify
+    import requests
+    import os
+
+    app = Flask(__name__)
+
+    QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant-federated.embedding-vllm.svc.cluster.local")
+    QDRANT_PORT = os.getenv("QDRANT_PORT", "6333")
+    OLLAMA_EMBED_HOST = os.getenv("OLLAMA_EMBED_HOST", "ollama-embed.inference-vllm.svc.cluster.local")
+    OLLAMA_EMBED_PORT = os.getenv("OLLAMA_EMBED_PORT", "11434")
+    INFERENCE_GATEWAY_HOST = os.getenv("INFERENCE_GATEWAY_HOST", "inference-gateway")
+    INFERENCE_GATEWAY_PORT = os.getenv("INFERENCE_GATEWAY_PORT", "80")
+    COLLECTION_NAME = os.getenv("COLLECTION_NAME", "documents")
+    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+    COMPLETION_MODEL = os.getenv("COMPLETION_MODEL", "phi3")
+
+    def get_embedding(text):
+        base = "http://{}:{}".format(OLLAMA_EMBED_HOST, OLLAMA_EMBED_PORT)
+        # Try /api/embed (current Ollama); fallback to /api/embeddings (older or some images)
+        for url, payload, key in [
+            ("{}/api/embed".format(base), {"model": EMBEDDING_MODEL, "input": text}, "embeddings"),
+            ("{}/api/embeddings".format(base), {"model": EMBEDDING_MODEL, "prompt": text}, "embedding"),
+        ]:
+            try:
+                r = requests.post(url, json=payload, timeout=60)
+                r.raise_for_status()
+                data = r.json()
+                vec = data.get(key) or data.get("embedding")
+                if isinstance(vec, list) and len(vec) > 0 and isinstance(vec[0], (int, float)):
+                    return vec
+                if isinstance(vec, list) and len(vec) > 0 and isinstance(vec[0], list):
+                    return vec[0]
+                if vec:
+                    return vec
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 404:
+                    continue
+                raise
+        raise RuntimeError("Ollama embedding failed: neither /api/embed nor /api/embeddings responded OK")
+
+    @app.route("/health", methods=["GET"])
+    def health():
+        return jsonify({"status": "healthy"})
+
+    @app.route("/query", methods=["POST"])
+    def query():
+        data = request.json or {}
+        question = data.get("question", "").strip()
+        if not question:
+            return jsonify({"error": "No question provided"}), 400
+        debug_info = {}
+
+        try:
+            query_vector = get_embedding(question)
+            if not query_vector:
+                debug_info["embedding_error"] = "Empty embedding"
+                return jsonify({
+                    "question": question,
+                    "answer": "Failed to generate embedding",
+                    "sources": [], "source_count": 0, "debug": debug_info
+                })
+            debug_info["embedding_dims"] = len(query_vector)
+        except Exception as e:
+            debug_info["embedding_error"] = str(e)
+            return jsonify({
+                "question": question,
+                "answer": "Embedding error: " + str(e),
+                "sources": [], "source_count": 0, "debug": debug_info
+            })
+
+        try:
+            qdrant_url = "http://{}:{}/collections/{}/points/search".format(
+                QDRANT_HOST, QDRANT_PORT, COLLECTION_NAME
+            )
+            search_response = requests.post(
+                qdrant_url,
+                json={"vector": query_vector, "limit": 3, "with_payload": True},
+                timeout=10
+            )
+            search_data = search_response.json()
+            results = search_data.get("result", [])
+            debug_info["search_results"] = len(results)
+            context_docs = [r.get("payload", {}).get("text", "") for r in results]
+        except Exception as e:
+            debug_info["search_error"] = str(e)
+            context_docs = []
+
+        context = "\n\n".join(context_docs) if context_docs else "No relevant documents found."
+        prompt = "Based on the following context, answer the question.\n\nContext:\n" + context + "\n\nQuestion: " + question + "\n\nAnswer:"
+
+        try:
+            llm_url = "http://{}:{}/v1/chat/completions".format(INFERENCE_GATEWAY_HOST, INFERENCE_GATEWAY_PORT)
+            llm_response = requests.post(
+                llm_url,
+                json={
+                    "model": COMPLETION_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                },
+                timeout=120,
+            )
+            data = llm_response.json()
+            answer = (data.get("choices") or [{}])[0].get("message", {}).get("content", "Unable to generate response")
+        except Exception as e:
+            answer = "LLM error: " + str(e)
+            debug_info["llm_error"] = str(e)
+
+        return jsonify({
+            "question": question,
+            "answer": answer,
+            "sources": context_docs,
+            "source_count": len(context_docs),
+            "debug": debug_info
+        })
+
+    @app.route("/chat", methods=["POST"])
+    def chat():
+        data = request.json or {}
+        try:
+            llm_url = "http://{}:{}/v1/chat/completions".format(INFERENCE_GATEWAY_HOST, INFERENCE_GATEWAY_PORT)
+            llm_response = requests.post(
+                llm_url,
+                json={
+                    "model": data.get("model", COMPLETION_MODEL),
+                    "messages": data.get("messages", []),
+                    "stream": data.get("stream", False),
+                },
+                timeout=120,
+            )
+            llm_response.raise_for_status()
+            return jsonify(llm_response.json())
+        except Exception as e:
+            return jsonify({"error": str(e), "choices": []}), 502
+
+    @app.route("/", methods=["GET"])
+    def index():
+        return jsonify({
+            "service": "RAG Agent (vLLM / kgateway)",
+            "endpoints": {
+                "/query": "POST - Ask a question (RAG)",
+                "/chat": "POST - Chat completions (proxied to inference gateway)",
+                "/health": "GET - Health check"
+            }
+        })
+
+    if __name__ == "__main__":
+        app.run(host="0.0.0.0", port=8080)

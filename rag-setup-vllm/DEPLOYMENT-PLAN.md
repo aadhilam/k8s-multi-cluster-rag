@@ -159,3 +159,17 @@ rag-setup-vllm/
 - **Monitoring**: Enabling the monitoring stack recommended by llm-d (e.g. Prometheus/Grafana) in the inference cluster will help with tuning and debugging; it can be added in Phase 0 or after Phase 3.
 
 This plan is ready to be implemented step by step; all related files and scripts should live under `rag-setup-vllm/` as above.
+
+---
+
+## 6. Implemented layout (this repo)
+
+The deployment has been implemented under `rag-setup-vllm/` with the same folder hierarchy as `rag-setup/`:
+
+- **Makefile** — `apply-all`, `apply-gateway`, `apply-inference`, `apply-embedding`, `delete-*`, `install-inference-stack` (runs inference-cluster/scripts to install CRDs + kgateway).
+- **gateway-cluster/manifests/** — Namespaces (gateway-vllm, inference-vllm, embedding-vllm), frontend (config, nginx, deployment, LoadBalancer), federated rag-agent service.
+- **embedding-cluster/manifests/** — Namespace embedding-vllm, Qdrant, embedding-ollama, sample-documents, embedding script ConfigMap, embedding CronJob, qdrant-lb.
+- **inference-cluster/manifests/** — Namespaces (inference-vllm, embedding-vllm), ollama-embed (PVC, deployment, service), qdrant-federated, RAG agent (ConfigMap, deployment, service), inference-gateway ExternalName (points to llm-d gateway service after install).
+- **inference-cluster/scripts/** — Makefile: `install` (Gateway API CRDs + Inference Extension CRDs + kgateway), `install-llmd-help` (manual llm-d steps). See README there.
+
+Namespaces use the **-vllm** suffix (gateway-vllm, inference-vllm, embedding-vllm) so this setup can coexist with the original `rag-setup/`. See **RAG-SETUP-VLLM-OVERVIEW.md** for data flow and apply/delete usage.

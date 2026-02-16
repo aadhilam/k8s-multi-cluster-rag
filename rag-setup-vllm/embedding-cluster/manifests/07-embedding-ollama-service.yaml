@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: embedding-ollama
+  namespace: embedding-vllm
+  labels:
+    app: embedding-ollama
+spec:
+  selector:
+    app: embedding-ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: 11434
+  type: ClusterIP

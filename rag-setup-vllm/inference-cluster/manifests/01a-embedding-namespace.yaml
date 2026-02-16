@@ -1,0 +1,8 @@
+# Namespace for federated services whose backend runs in embedding-cluster (embedding-vllm)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: embedding-vllm
+  labels:
+    app.kubernetes.io/part-of: ai-platform-vllm
+    environment: federated

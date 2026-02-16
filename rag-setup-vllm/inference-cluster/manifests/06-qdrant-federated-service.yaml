@@ -1,0 +1,17 @@
+# Federated service: reach Qdrant in embedding-cluster (embedding-vllm namespace) via Calico cluster mesh
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant-federated
+  namespace: embedding-vllm
+  annotations:
+    federation.tigera.io/serviceSelector: app == "qdrant"
+spec:
+  ports:
+    - name: http
+      port: 6333
+      targetPort: 6333
+    - name: grpc
+      port: 6334
+      targetPort: 6334
+  type: ClusterIP

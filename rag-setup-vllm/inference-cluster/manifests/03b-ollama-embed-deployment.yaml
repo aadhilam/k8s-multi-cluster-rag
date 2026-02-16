@@ -1,0 +1,75 @@
+# Embedding-only Ollama in inference cluster: nomic-embed-text for RAG query embeddings (CPU)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-embed
+  namespace: inference-vllm
+  labels:
+    app: ollama-embed
+    app.kubernetes.io/part-of: ai-platform-vllm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ollama-embed
+  template:
+    metadata:
+      labels:
+        app: ollama-embed
+        app.kubernetes.io/part-of: ai-platform-vllm
+    spec:
+      initContainers:
+        - name: model-pull
+          image: ollama/ollama:latest
+          env:
+            - name: OLLAMA_NUM_PARALLEL
+              value: "4"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              ollama serve &
+              until ollama list >/dev/null 2>&1; do sleep 1; done
+              ollama pull nomic-embed-text
+              pkill ollama || true
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+          resources:
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          ports:
+            - containerPort: 11434
+              name: http
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          readinessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            initialDelaySeconds: 40
+            periodSeconds: 30
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ollama-embed-models

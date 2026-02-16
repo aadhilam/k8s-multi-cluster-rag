@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-embed-models
+  namespace: inference-vllm
+  labels:
+    app: ollama-embed
+    app.kubernetes.io/part-of: ai-platform-vllm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

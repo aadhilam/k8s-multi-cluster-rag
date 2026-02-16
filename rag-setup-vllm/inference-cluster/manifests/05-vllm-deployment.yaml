@@ -1,0 +1,112 @@
+# Standalone vLLM deployment for inference (Tesla T4, 1 GPU)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-inference
+  namespace: inference-vllm
+  labels:
+    app: vllm-inference
+    app.kubernetes.io/part-of: ai-platform-vllm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-inference
+  template:
+    metadata:
+      labels:
+        app: vllm-inference
+        app.kubernetes.io/part-of: ai-platform-vllm
+        llm-d.ai/inference-serving: "true"
+        llm-d.ai/guide: "inference-scheduling"
+    spec:
+      nodeSelector:
+        workload: llm
+      tolerations:
+        - key: "workload"
+          operator: "Equal"
+          value: "llm"
+          effect: "NoSchedule"
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.6.6
+          env:
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+            - name: HF_HOME
+              value: "/data/hf-cache"
+          args:
+            - "--model"
+            - "Qwen/Qwen2.5-1.5B-Instruct"
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - "8000"
+            - "--gpu-memory-utilization"
+            - "0.90"
+            - "--max-model-len"
+            - "4096"
+            - "--dtype"
+            - "half"
+          ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "2"
+              memory: 16Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: 16Gi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: shm
+              mountPath: /dev/shm
+            - name: hf-cache
+              mountPath: /data/hf-cache
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi
+        - name: hf-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-inference
+  namespace: inference-vllm
+  labels:
+    app: vllm-inference
+spec:
+  selector:
+    app: vllm-inference
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP

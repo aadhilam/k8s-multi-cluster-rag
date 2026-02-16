@@ -16,7 +16,7 @@ endif
 # Default shell
 SHELL := /bin/bash
 
-.PHONY: all help setup-backend infra kubeconfigs install-calico check-api install-cc check-cc mesh clean destroy rag-apply rag-apply-gateway rag-apply-inference rag-apply-embedding rag-delete rag-delete-gateway rag-delete-inference rag-delete-embedding
+.PHONY: all help setup-backend infra kubeconfigs install-calico check-api install-cc check-cc mesh clean destroy rag-apply rag-apply-gateway rag-apply-inference rag-apply-embedding rag-delete rag-delete-gateway rag-delete-inference rag-delete-embedding install-inference-stack rag-apply-vllm rag-apply-vllm-inference rag-apply-vllm-gateway rag-apply-vllm-embedding rag-delete-vllm deploy-inference-vllm
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -109,6 +109,51 @@ rag-delete-inference: ## Delete RAG manifests from inference-cluster only
 
 rag-delete-embedding: ## Delete RAG manifests from embedding-cluster only
 	$(MAKE) -C rag-setup delete-embedding KUBECONFIG_DIR=../kubeconfigs
+
+# ──────────────────────────────────────────────────────────────────────────────
+# RAG-vLLM (llm-d / kgateway / standalone vLLM)
+#
+# Deployment order (from scratch or after rag-delete-vllm):
+#   1. make install-inference-stack   – installs CRDs, kgateway, llm-d Helm charts
+#                                       on the inference cluster, then runs
+#                                       post-install-fixups (scales down the broken
+#                                       llm-d modelservice, removes the InferencePool-
+#                                       based HTTPRoute, restarts gateway).
+#   2. make rag-apply-vllm            – applies K8s manifests to all 3 clusters:
+#                                         gateway-cluster:   frontend
+#                                         inference-cluster: standalone vLLM, RAG agent,
+#                                                            direct HTTPRoute, ollama-embed
+#                                         embedding-cluster: qdrant, embedding-ollama
+#
+# One-shot deploy (inference cluster only, steps 1+2 combined):
+#     make deploy-inference-vllm
+#
+# Important: rag-delete-vllm deletes the inference-vllm namespace, which also
+# wipes the Helm releases (gateway proxy, EPP, InferencePool). You must re-run
+# install-inference-stack before rag-apply-vllm in that case.
+#
+# See docs/VLLM-DEPLOYMENT-TROUBLESHOOTING.md for full details.
+# ──────────────────────────────────────────────────────────────────────────────
+
+rag-apply-vllm: ## Apply RAG-vLLM manifests to all clusters
+	$(MAKE) -C rag-setup-vllm apply-all KUBECONFIG_DIR=../kubeconfigs
+
+rag-apply-vllm-inference: ## Apply RAG-vLLM manifests to inference-cluster only
+	$(MAKE) -C rag-setup-vllm apply-inference KUBECONFIG_DIR=../kubeconfigs
+
+rag-apply-vllm-gateway: ## Apply RAG-vLLM manifests to gateway-cluster only
+	$(MAKE) -C rag-setup-vllm apply-gateway KUBECONFIG_DIR=../kubeconfigs
+
+rag-apply-vllm-embedding: ## Apply RAG-vLLM manifests to embedding-cluster only
+	$(MAKE) -C rag-setup-vllm apply-embedding KUBECONFIG_DIR=../kubeconfigs
+
+rag-delete-vllm: ## Delete RAG-vLLM manifests from all clusters
+	$(MAKE) -C rag-setup-vllm delete-all KUBECONFIG_DIR=../kubeconfigs
+
+install-inference-stack: ## Install CRDs, kgateway, and llm-d (vLLM) on inference cluster (requires kubeconfigs)
+	$(MAKE) -C rag-setup-vllm install-inference-stack KUBECONFIG_DIR=../kubeconfigs
+
+deploy-inference-vllm: install-inference-stack rag-apply-vllm-inference ## Full deploy: CRDs + kgateway + llm-d fixups + manifests (inference cluster)
 
 clean: ## Remove local kubeconfigs and temp files from make all / scripts
 	rm -rf kubeconfigs cluster-mesh-setup

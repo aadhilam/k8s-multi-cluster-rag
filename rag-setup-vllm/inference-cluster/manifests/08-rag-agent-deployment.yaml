@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-agent
+  namespace: inference-vllm
+  labels:
+    app: rag-agent
+    app.kubernetes.io/part-of: ai-platform-vllm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rag-agent
+  template:
+    metadata:
+      labels:
+        app: rag-agent
+        app.kubernetes.io/part-of: ai-platform-vllm
+    spec:
+      containers:
+        - name: rag-agent
+          image: python:3.11-slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install flask requests --quiet
+              python /app/app.py
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: QDRANT_HOST
+              value: "qdrant-federated.embedding-vllm.svc.cluster.local"
+            - name: QDRANT_PORT
+              value: "6333"
+            - name: OLLAMA_EMBED_HOST
+              value: "ollama-embed.inference-vllm.svc.cluster.local"
+            - name: OLLAMA_EMBED_PORT
+              value: "11434"
+            - name: INFERENCE_GATEWAY_HOST
+              value: "inference-gateway"
+            - name: INFERENCE_GATEWAY_PORT
+              value: "80"
+            - name: COLLECTION_NAME
+              value: "documents"
+            - name: EMBEDDING_MODEL
+              value: "nomic-embed-text"
+            - name: COMPLETION_MODEL
+              value: "Qwen/Qwen2.5-1.5B-Instruct"
+          volumeMounts:
+            - name: app-code
+              mountPath: /app
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: app-code
+          configMap:
+            name: rag-agent-config

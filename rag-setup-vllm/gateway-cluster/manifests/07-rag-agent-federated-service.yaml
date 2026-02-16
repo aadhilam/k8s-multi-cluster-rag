@@ -1,0 +1,14 @@
+# Federated service: reach RAG agent in inference-cluster (inference-vllm namespace) via Calico cluster mesh
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-agent
+  namespace: inference-vllm
+  annotations:
+    federation.tigera.io/serviceSelector: app == "rag-agent"
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
