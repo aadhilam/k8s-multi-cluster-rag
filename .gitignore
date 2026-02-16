@@ -9,3 +9,5 @@ config.json
 licensekey.yaml
 cluster-mesh-setup/
 .DS_Store
+docs/
+tigera-operator*.tgz
