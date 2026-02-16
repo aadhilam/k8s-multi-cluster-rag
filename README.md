@@ -65,9 +65,17 @@ You can run individual steps if you need to debug or pause between stages:
    make install-calico
    ```
 
-4. **Install Calico Cloud**: Upgrade the clusters to Calico Cloud.
+4. **Install Calico**:
+
+For Calico Cloud 
+
    ```bash
    make install-cc
+   ```
+
+For Calico Enterprise
+   ```bash
+   make install-ce
    ```
 
 5. **Cluster Mesh**: Configure peering between the clusters.
@@ -86,7 +94,7 @@ You can run individual steps if you need to debug or pause between stages:
    make rag-delete-inference   # delete from inference only
    make rag-delete-embedding   # delete from embedding only
    ```
-   See [MANIFESTS.md](./MANIFESTS.md) for layout. Phase 1 uses federated services only; the frontend is exposed via a LoadBalancer and proxies API traffic to RAG and LiteLLM.
+
 
 ### Utilities
 
